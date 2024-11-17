@@ -1,6 +1,8 @@
 import pyMeow
 import time
 from math import sqrt
+import numpy as np
+import matplotlib.pyplot as plt
 
 def initialize_overlay(window_name="ShellShock Live"):
     pyMeow.overlay_init(target=window_name, title="Multi-Tool Overlay", fps=60, trackTarget=True)
@@ -19,8 +21,11 @@ def find_closest_point(points, pos):
             closest_point = point
     return closest_point
 
-def flip_y(y):
-    return pyMeow.get_screen_height() - y
+def screen_to_physics(x, y):
+    return x, pyMeow.get_screen_height() - y
+
+def physics_to_screen(x, y):
+    return x, pyMeow.get_screen_height() - y
 
 def main():
     initialize_overlay()
@@ -28,6 +33,7 @@ def main():
     point1, point2 = None, None
     toggle_drawing = False
     input_mode = "off"
+    modes = ['off', 'distance', 'points', 'cronometro', 'regression']
     points_ready = False
     points = []
     timer_start = None
@@ -45,34 +51,47 @@ def main():
 
         window_pos = pyMeow.get_window_position()
 
-        if pyMeow.key_pressed(84):
+        if pyMeow.key_pressed(84): 
             toggle_drawing = not toggle_drawing
             time.sleep(0.2)
 
-        if pyMeow.key_pressed(77):
-            input_mode = "distance" if input_mode == "off" else "points" if input_mode == "distance" else "cronometro" if input_mode == "points" else "off"
+        if pyMeow.key_pressed(77):  
+            current_index = modes.index(input_mode)
+            input_mode = modes[(current_index + 1) % len(modes)]
             time.sleep(0.2)
 
+       
         if input_mode == "distance":
             if pyMeow.mouse_pressed("left"):
                 pos = pyMeow.mouse_position()
-                point1 = {'x': pos['x'] - window_pos['x'], 'y': pos['y'] - window_pos['y']}
+                x_screen = pos['x'] - window_pos['x']
+                y_screen = pos['y'] - window_pos['y']
+                x_phys, y_phys = screen_to_physics(x_screen, y_screen)
+                point1 = {'x': x_phys, 'y': y_phys}
                 points_ready = False
                 time.sleep(0.2)
             elif pyMeow.mouse_pressed("right"):
                 pos = pyMeow.mouse_position()
-                point2 = {'x': pos['x'] - window_pos['x'], 'y': pos['y'] - window_pos['y']}
+                x_screen = pos['x'] - window_pos['x']
+                y_screen = pos['y'] - window_pos['y']
+                x_phys, y_phys = screen_to_physics(x_screen, y_screen)
+                point2 = {'x': x_phys, 'y': y_phys}
                 points_ready = False
                 time.sleep(0.2)
 
-        elif input_mode == "points":
+        elif input_mode == "points" or input_mode == "regression":
             pos = pyMeow.mouse_position()
-            pos = {'x': pos['x'] - window_pos['x'], 'y': pos['y'] - window_pos['y']}
+            x_screen = pos['x'] - window_pos['x']
+            y_screen = pos['y'] - window_pos['y']
+            x_phys, y_phys = screen_to_physics(x_screen, y_screen)
             if pyMeow.mouse_pressed("left"):
-                points.append(pos)
+                if input_mode == "regression":
+                    point1 = {'x': x_phys, 'y': y_phys}
+                else:
+                    points.append({'x': x_phys, 'y': y_phys})
                 time.sleep(0.2)
             elif pyMeow.mouse_pressed("right") and points:
-                closest_point = find_closest_point(points, pos)
+                closest_point = find_closest_point(points, {'x': x_phys, 'y': y_phys})
                 if closest_point:
                     points.remove(closest_point)
                 time.sleep(0.2)
@@ -87,21 +106,41 @@ def main():
                 timer_running = False
                 time.sleep(0.2)
 
+    
         if toggle_drawing:
+       
             if point1 and point2:
-                if not points_ready:
-                    points_ready = True
-                pyMeow.draw_line(point1['x'], point1['y'], point2['x'], point2['y'], pyMeow.get_color("red"))
-                distance = distance_between_points(point1, point2)
-                midpoint_x = (point1['x'] + point2['x']) / 2
-                midpoint_y = (point1['y'] + point2['y']) / 2
-                pyMeow.draw_text(f"Distancia: {distance:.2f}", midpoint_x, midpoint_y, font_size, pyMeow.get_color("white"))
+                sx = point2['x'] - point1['x']
+                sy = point2['y'] - point1['y']
+                total_distance = sqrt(sx ** 2 + sy ** 2)
+                
+         
+                x_screen1, y_screen1 = physics_to_screen(point1['x'], point1['y'])
+                x_screen2, y_screen2 = physics_to_screen(point2['x'], point2['y'])
+                
+          
+                pyMeow.draw_line(x_screen1, y_screen1, x_screen2, y_screen2, pyMeow.get_color("red"))
+                
+            
+                midpoint_x = (x_screen1 + x_screen2) / 2
+                midpoint_y = (y_screen1 + y_screen2) / 2
+                
+   
+                pyMeow.draw_text(f"Distancia total: {total_distance:.2f} px", midpoint_x, midpoint_y - 20, font_size, pyMeow.get_color("white"))
+                pyMeow.draw_text(f"sx: {sx:.2f} px", midpoint_x, midpoint_y, font_size, pyMeow.get_color("cyan"))
+                pyMeow.draw_text(f"sy: {sy:.2f} px", midpoint_x, midpoint_y + 20, font_size, pyMeow.get_color("cyan"))
+            
+        
+            if point1:
+                x_screen1, y_screen1 = physics_to_screen(point1['x'], point1['y'])
+                pyMeow.draw_circle(x_screen1, y_screen1, 6, pyMeow.get_color("green"))
+                pyMeow.draw_text(f"({int(point1['x'])}, {int(point1['y'])})", x_screen1 + 10, y_screen1, font_size, pyMeow.get_color("white"))
+            if point2:
+                x_screen2, y_screen2 = physics_to_screen(point2['x'], point2['y'])
+                pyMeow.draw_circle(x_screen2, y_screen2, 6, pyMeow.get_color("blue"))
+                pyMeow.draw_text(f"({int(point2['x'])}, {int(point2['y'])})", x_screen2 + 10, y_screen2, font_size, pyMeow.get_color("white"))
 
-            for point in points:
-                pyMeow.draw_circle(point['x'], point['y'], 6, pyMeow.get_color("green"))
-                flipped_y = flip_y(point['y'])
-                pyMeow.draw_text(f"({int(point['x'])}, {int(flipped_y)})", point['x'] + 10, point['y'], font_size, pyMeow.get_color("white"))
-
+      
             if timer_running:
                 elapsed_time = time.time() - timer_start
                 pyMeow.draw_text(f"Tiempo: {elapsed_time:.2f} s", margin_x, margin_y + 2 * label_height, font_size, pyMeow.get_color("yellow"))
@@ -109,8 +148,70 @@ def main():
                 total_time = timer_end - timer_start
                 pyMeow.draw_text(f"Tiempo total: {total_time:.2f} s", margin_x, margin_y + 2 * label_height, font_size, pyMeow.get_color("yellow"))
 
-        pyMeow.end_drawing()
+        
+            if points:
+                for point in points:
+                    x_screen, y_screen = physics_to_screen(point['x'], point['y'])
+                    pyMeow.draw_circle(x_screen, y_screen, 4, pyMeow.get_color("white"))
+                    if point1:
+                      
+                        sx = point['x'] - point1['x']
+                        sy = point['y'] - point1['y']
+                    
+                        pyMeow.draw_text(f"({sx:.2f}, {sy:.2f})", x_screen + 5, y_screen - 15, font_size, pyMeow.get_color("white"))
 
+         
+            if point1 and len(points) >= 3:
+                sx_list = []
+                sy_list = []
+                for point in points:
+                    sx = point['x'] - point1['x']
+                    sy = point['y'] - point1['y']
+                    sx_list.append(sx)
+                    sy_list.append(sy)
+              
+                coefficients = np.polyfit(sx_list, sy_list, 2)
+                a, b, c = coefficients
+    
+                sx_range = np.linspace(min(sx_list), max(sx_list), 100)
+                sy_fit = a * sx_range**2 + b * sx_range + c
+      
+                x_curve_screen = [physics_to_screen(sx + point1['x'], 0)[0] for sx in sx_range]
+                y_curve_screen = [physics_to_screen(0, sy + point1['y'])[1] for sy in sy_fit]
+        
+                for i in range(len(x_curve_screen) - 1):
+                    pyMeow.draw_line(
+                        x_curve_screen[i], y_curve_screen[i],
+                        x_curve_screen[i + 1], y_curve_screen[i + 1],
+                        pyMeow.get_color("red")
+                    )
+          
+                pyMeow.draw_text(f"sy = {a:.4f}*sx^2 + {b:.4f}*sx + {c:.4f}", margin_x, margin_y + 3 * label_height, font_size, pyMeow.get_color("yellow"))
+
+     
+        if pyMeow.key_pressed(83):  
+            if point1 and len(points) >= 3:
+                sx_array = np.array([p['x'] - point1['x'] for p in points])
+                sy_array = np.array([p['y'] - point1['y'] for p in points])
+                coefficients = np.polyfit(sx_array, sy_array, 2)
+                a, b, c = coefficients
+                plt.figure()
+                plt.scatter(sx_array, sy_array, color='blue', label='Datos')
+                sx_fit = np.linspace(min(sx_array), max(sx_array), 500)
+                sy_fit = a * sx_fit**2 + b * sx_fit + c
+                plt.plot(sx_fit, sy_fit, color='red', label='Regresión Cuadrática')
+                plt.xlabel('sx')
+                plt.ylabel('sy')
+                plt.title('Regresión Cuadrática')
+                plt.legend()
+                plt.savefig('regression_plot.png')
+                plt.close()
+                pyMeow.draw_text("Imagen de regresión guardada.", margin_x, margin_y + 4 * label_height, font_size, pyMeow.get_color("green"))
+            else:
+                pyMeow.draw_text("No hay suficientes datos para guardar la imagen.", margin_x, margin_y + 4 * label_height, font_size, pyMeow.get_color("red"))
+            time.sleep(0.2)
+
+        pyMeow.end_drawing()
 
     pyMeow.overlay_close()
 
