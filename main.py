@@ -3,6 +3,7 @@ import time
 from math import sqrt
 import numpy as np
 import matplotlib.pyplot as plt
+import subprocess
 
 def initialize_overlay(window_name="ShellShock Live"):
     pyMeow.overlay_init(target=window_name, title="Multi-Tool Overlay", fps=60, trackTarget=True)
@@ -59,6 +60,13 @@ def main():
             current_index = modes.index(input_mode)
             input_mode = modes[(current_index + 1) % len(modes)]
             time.sleep(0.2)
+
+        if pyMeow.key_pressed(80): 
+            if point1 and point2:
+                sx = point2['x'] - point1['x']
+                sy = point2['y'] - point1['y']
+                subprocess.Popen(["python3", "calculate.py", str(sx), str(sy)])
+                time.sleep(0.2)            
 
        
         if input_mode == "distance":
